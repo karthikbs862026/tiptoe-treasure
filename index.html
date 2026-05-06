@@ -35,6 +35,15 @@
         <div id="dialog" class="dialog hidden" role="dialog" aria-live="polite">
           <h1 id="dialogTitle">Tiptoe Treasure</h1>
           <p id="dialogText"></p>
+          <div id="lockPanel" class="lock-panel hidden" aria-label="Treasure chest symbol lock">
+            <div id="lockClues" class="lock-clues"></div>
+            <div id="lockCode" class="lock-code"></div>
+            <div id="lockChoices" class="lock-choices"></div>
+          </div>
+          <div id="levelPanel" class="level-panel hidden" aria-label="Level select and stickers">
+            <div id="levelChoices" class="level-choices"></div>
+            <div id="stickerShelf" class="sticker-shelf"></div>
+          </div>
           <button id="dialogButton" type="button">Start</button>
         </div>
 
@@ -45,6 +54,7 @@
           <button data-dir="right" aria-label="Move right">&gt;</button>
         </div>
 
+        <button id="distractBtn" class="distract-btn" type="button">Toy</button>
         <button id="actionBtn" class="action-btn" type="button">Look</button>
       </section>
     </main>
