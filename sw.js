@@ -1,9 +1,9 @@
-const CACHE_NAME = "tiptoe-treasure-v1";
+const CACHE_NAME = "tiptoe-treasure-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
-  "./src/game.js",
+  "./game.js",
   "./manifest.webmanifest",
   "./assets/icon-192.png",
   "./assets/icon-512.png"
