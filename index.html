@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#3d6461" />
+    <meta name="description" content="A cozy mobile stealth search game for Android and iOS browsers." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Tiptoe Treasure" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Tiptoe Treasure</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="game-wrap" aria-label="Tiptoe Treasure game">
+        <canvas id="game" width="960" height="640" aria-label="House stealth puzzle playfield"></canvas>
+
+        <div class="hud top-left">
+          <div class="brand">Tiptoe Treasure</div>
+          <div id="objective" class="objective">Find clues, stay calm, discover the hidden board game.</div>
+        </div>
+
+        <div class="hud top-right">
+          <div class="meter-label">Calm</div>
+          <div class="calm-track"><span id="calmFill"></span></div>
+          <button id="soundBtn" class="icon-btn" type="button" aria-label="Toggle sound">Snd</button>
+          <button id="shareBtn" class="icon-btn" type="button" aria-label="Share game">Share</button>
+        </div>
+
+        <div id="prompt" class="prompt" aria-live="polite"></div>
+
+        <div id="dialog" class="dialog hidden" role="dialog" aria-live="polite">
+          <h1 id="dialogTitle">Tiptoe Treasure</h1>
+          <p id="dialogText"></p>
+          <button id="dialogButton" type="button">Start</button>
+        </div>
+
+        <div class="touch-pad" aria-label="Movement controls">
+          <button data-dir="up" aria-label="Move up">^</button>
+          <button data-dir="left" aria-label="Move left">&lt;</button>
+          <button data-dir="down" aria-label="Move down">v</button>
+          <button data-dir="right" aria-label="Move right">&gt;</button>
+        </div>
+
+        <button id="actionBtn" class="action-btn" type="button">Look</button>
+      </section>
+    </main>
+    <script defer src="./src/game.js"></script>
+  </body>
+</html>
