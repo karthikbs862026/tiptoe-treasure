@@ -1067,17 +1067,17 @@ function draw() {
   const viewW = canvas.clientWidth;
   const viewH = canvas.clientHeight;
   const portrait = viewH > viewW * 1.18;
-  const fitScale = Math.min(viewW / (WORLD_W * TILE), viewH / (WORLD_H * TILE));
-  const zoomScale = portrait ? Math.min(viewW / (11.2 * TILE), viewH / (8.6 * TILE), 1.08) : fitScale;
-  const scale = Math.max(fitScale, zoomScale);
+  const topReserve = portrait ? Math.min(136, viewH * 0.18) : 0;
+  const bottomReserve = portrait ? Math.min(250, viewH * 0.31) : 0;
+  const playfieldH = Math.max(220, viewH - topReserve - bottomReserve);
+  const fitScale = portrait
+    ? Math.min((viewW - 8) / (WORLD_W * TILE), playfieldH / (WORLD_H * TILE))
+    : Math.min(viewW / (WORLD_W * TILE), viewH / (WORLD_H * TILE));
+  const scale = fitScale * (portrait ? 0.985 : 1);
   const worldPxW = WORLD_W * TILE * scale;
   const worldPxH = WORLD_H * TILE * scale;
-  const centerX = portrait ? player.x * TILE : (WORLD_W * TILE) / 2;
-  const centerY = portrait ? player.y * TILE : (WORLD_H * TILE) / 2;
-  const desiredOx = portrait ? viewW * 0.5 - centerX * scale : (viewW - worldPxW) / 2;
-  const desiredOy = portrait ? viewH * 0.46 - centerY * scale : (viewH - worldPxH) / 2;
-  const ox = worldPxW > viewW ? clamp(desiredOx, viewW - worldPxW - 6, 6) : (viewW - worldPxW) / 2;
-  const oy = worldPxH > viewH ? clamp(desiredOy, viewH - worldPxH - 6, 6) : portrait ? Math.max(128, (viewH - worldPxH) * 0.38) : (viewH - worldPxH) / 2;
+  const ox = (viewW - worldPxW) / 2;
+  const oy = portrait ? topReserve + Math.max(0, (playfieldH - worldPxH) * 0.5) : (viewH - worldPxH) / 2;
 
   const bg = ctx.createLinearGradient(0, 0, viewW, viewH);
   bg.addColorStop(0, "#46766f");
@@ -1610,19 +1610,19 @@ function drawSearchSpot(spot) {
       ? "rgba(85, 72, 78, 0.12)"
       : `rgba(255, 247, 226, ${0.24 + pulse * 0.14})`;
   ctx.beginPath();
-  ctx.arc(x, y, isFound ? 31 + pulse * 5 : isRecent ? 27 : 22 + pulse * 2, 0, Math.PI * 2);
+  ctx.arc(x, y, isFound ? 34 + pulse * 5 : isRecent ? 30 : 25 + pulse * 2, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = isFound ? colors.goal : hasFoundPiece ? colors.piece : checked ? "#9f9280" : colors.clue;
   ctx.beginPath();
-  ctx.arc(x, y, isFound ? 16 : 13, 0, Math.PI * 2);
+  ctx.arc(x, y, isFound ? 18 : 15, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = checked ? "rgba(79,68,74,0.34)" : colors.clueEdge;
   ctx.lineWidth = 2;
   ctx.stroke();
 
   ctx.fillStyle = "#fff7e9";
-  ctx.font = "900 16px Trebuchet MS, sans-serif";
+  ctx.font = "900 18px Trebuchet MS, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(isFound ? "!" : hasFoundPiece ? symbolGlyphs[spot.pieceSymbol] : checked ? "x" : "?", x, y + 0.5);

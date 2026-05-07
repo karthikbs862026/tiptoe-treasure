@@ -459,7 +459,7 @@ body.is-playing .distract-btn {
 @media (max-width: 520px) {
   .top-left {
     width: calc(100vw - 24px);
-    padding: 7px 9px;
+    padding: 6px 9px;
     border-radius: 10px;
   }
 
@@ -472,7 +472,7 @@ body.is-playing .distract-btn {
   }
 
   .top-right {
-    top: max(66px, calc(env(safe-area-inset-top) + 66px));
+    top: max(62px, calc(env(safe-area-inset-top) + 62px));
     grid-template-columns: 68px 34px 36px 46px;
     gap: 6px;
     padding: 7px;
@@ -502,32 +502,33 @@ body.is-playing .distract-btn {
   }
 
   .touch-pad {
-    grid-template-columns: repeat(3, 52px);
-    grid-template-rows: repeat(3, 52px);
-    bottom: max(72px, calc(env(safe-area-inset-bottom) + 72px));
+    grid-template-columns: repeat(3, 44px);
+    grid-template-rows: repeat(3, 44px);
+    bottom: max(42px, calc(env(safe-area-inset-bottom) + 42px));
   }
 
   .touch-pad button {
-    width: 52px;
-    height: 52px;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
   }
 
   .action-btn {
-    width: 84px;
-    height: 58px;
-    bottom: max(78px, calc(env(safe-area-inset-bottom) + 78px));
+    width: 80px;
+    height: 50px;
+    bottom: max(46px, calc(env(safe-area-inset-bottom) + 46px));
   }
 
   .distract-btn {
-    right: max(108px, calc(env(safe-area-inset-right) + 108px));
-    width: 76px;
-    height: 58px;
-    bottom: max(78px, calc(env(safe-area-inset-bottom) + 78px));
+    right: max(102px, calc(env(safe-area-inset-right) + 102px));
+    width: 72px;
+    height: 50px;
+    bottom: max(46px, calc(env(safe-area-inset-bottom) + 46px));
   }
 
   .prompt {
     left: 56%;
-    bottom: max(148px, calc(env(safe-area-inset-bottom) + 148px));
+    bottom: max(104px, calc(env(safe-area-inset-bottom) + 104px));
     max-width: min(250px, calc(100vw - 170px));
     padding: 8px 12px;
     font-size: 12px;

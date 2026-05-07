@@ -1,4 +1,4 @@
-const CACHE_NAME = "tiptoe-treasure-v15";
+const CACHE_NAME = "tiptoe-treasure-v17";
 const ASSETS = [
   "./",
   "./index.html",
