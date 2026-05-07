@@ -16,6 +16,7 @@ const levelChoices = document.querySelector("#levelChoices");
 const stickerShelf = document.querySelector("#stickerShelf");
 const actionBtn = document.querySelector("#actionBtn");
 const distractBtn = document.querySelector("#distractBtn");
+const pauseBtn = document.querySelector("#pauseBtn");
 const soundBtn = document.querySelector("#soundBtn");
 const shareBtn = document.querySelector("#shareBtn");
 
@@ -74,6 +75,7 @@ const stickerCatalog = {
   snackGenius: { label: "Snack Genius", mark: "SG" },
   thunderTimer: { label: "Thunder Timer", mark: "TT" },
   poodlePatrol: { label: "Poodle Patrol", mark: "PT" },
+  starChaser: { label: "Star Chaser", mark: "3S" },
   masterTiptoer: { label: "Master Tiptoer", mark: "MT" },
   gameNight: { label: "Family Game Night", mark: "FG" },
 };
@@ -278,6 +280,8 @@ const state = {
   unlockedLevel: 1,
   stickers: new Set(),
   earnedStickers: [],
+  bestStars: {},
+  activeMissions: [],
   wasSeen: false,
   lockInput: [],
   nearMiss: null,
@@ -337,6 +341,70 @@ function moveEntity(entity, dx, dy, dt) {
   if (!cellBlocked(entity.x, nextY)) entity.y = nextY;
 }
 
+function openCell(x, y) {
+  return x > 0 && y > 0 && x < WORLD_W - 1 && y < WORLD_H - 1 && !cellBlocked(x + 0.5, y + 0.5);
+}
+
+function nearestOpenCell(entity) {
+  const startX = Math.floor(entity.x);
+  const startY = Math.floor(entity.y);
+  if (openCell(startX, startY)) return { x: startX, y: startY };
+  const queue = [{ x: startX, y: startY }];
+  const seen = new Set([`${startX},${startY}`]);
+  for (let i = 0; i < queue.length; i += 1) {
+    const cell = queue[i];
+    const next = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+    ];
+    for (const item of next) {
+      const key = `${item.x},${item.y}`;
+      if (seen.has(key) || item.x < 0 || item.y < 0 || item.x >= WORLD_W || item.y >= WORLD_H) continue;
+      if (openCell(item.x, item.y)) return item;
+      seen.add(key);
+      queue.push(item);
+    }
+  }
+  return { x: startX, y: startY };
+}
+
+function routeStep(from, to) {
+  const start = nearestOpenCell(from);
+  const goal = nearestOpenCell(to);
+  if (start.x === goal.x && start.y === goal.y) return { x: to.x, y: to.y };
+  const queue = [start];
+  const cameFrom = new Map();
+  const seen = new Set([`${start.x},${start.y}`]);
+  while (queue.length) {
+    const cell = queue.shift();
+    if (cell.x === goal.x && cell.y === goal.y) break;
+    [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+    ].forEach((next) => {
+      const key = `${next.x},${next.y}`;
+      if (seen.has(key) || !openCell(next.x, next.y)) return;
+      seen.add(key);
+      cameFrom.set(key, cell);
+      queue.push(next);
+    });
+  }
+
+  const goalKey = `${goal.x},${goal.y}`;
+  if (!cameFrom.has(goalKey)) return { x: to.x, y: to.y };
+  let current = goal;
+  let previous = cameFrom.get(goalKey);
+  while (previous && !(previous.x === start.x && previous.y === start.y)) {
+    current = previous;
+    previous = cameFrom.get(`${current.x},${current.y}`);
+  }
+  return { x: current.x + 0.5, y: current.y + 0.5 };
+}
+
 function updatePlayer(dt) {
   let dx = 0;
   let dy = 0;
@@ -360,13 +428,14 @@ function updatePuppy(dt) {
     return;
   }
 
+  const patrolTargetEntity = puppyPatrolTarget();
   const crumb = nearestCrumb();
-  const target = puppyPatrolTarget() || crumb || player;
+  const target = patrolTargetEntity ? routeStep(puppy, patrolTargetEntity) : crumb || player;
   const dx = target.x - puppy.x;
   const dy = target.y - puppy.y;
   const dist = Math.hypot(dx, dy) || 1;
 
-  const patrolTarget = target === burglar;
+  const patrolTarget = Boolean(patrolTargetEntity);
   const stopDistance = patrolTarget ? 0.36 : crumb ? 0.42 : puppy.followDistance;
   if ((patrolTarget || crumb || dist < 5.8) && dist > stopDistance) {
     const speed = patrolTarget ? puppy.speed * 1.55 : crumb ? puppy.speed * 1.32 : puppy.excitement > 70 ? puppy.speed * 1.25 : puppy.speed;
@@ -378,7 +447,7 @@ function updatePuppy(dt) {
     }
   }
 
-  if (patrolTarget && distance(puppy, burglar) < 0.62) {
+  if (patrolTarget && distance(puppy, burglar) < 0.9) {
     catchBurglar();
     return;
   }
@@ -507,9 +576,11 @@ function loadProgress() {
     const saved = JSON.parse(localStorage.getItem(saveKey) || "{}");
     state.unlockedLevel = Math.max(1, Math.min(5, saved.unlockedLevel || 1));
     state.stickers = new Set(Array.isArray(saved.stickers) ? saved.stickers : []);
+    state.bestStars = saved.bestStars && typeof saved.bestStars === "object" ? saved.bestStars : {};
   } catch {
     state.unlockedLevel = 1;
     state.stickers = new Set();
+    state.bestStars = {};
   }
 }
 
@@ -520,10 +591,19 @@ function saveProgress() {
       JSON.stringify({
         unlockedLevel: state.unlockedLevel,
         stickers: [...state.stickers],
+        bestStars: state.bestStars,
       }),
     );
   } catch {
     // Progress saving is optional; the game still works without storage.
+  }
+}
+
+function updateBestStars(stars) {
+  const key = String(state.level);
+  if ((state.bestStars[key] || 0) < stars) {
+    state.bestStars[key] = stars;
+    saveProgress();
   }
 }
 
@@ -534,6 +614,56 @@ function unlockLevel(level) {
   }
 }
 
+function missionsForLevel(level) {
+  const shared = [
+    { id: "allPieces", label: "Find all 3 pieces", done: () => state.pieces.size === 3 },
+    { id: "steadyCalm", label: "Keep 60% calm", done: () => state.calm >= 60 },
+  ];
+  return {
+    1: [
+      shared[0],
+      { id: "fewSearches", label: "Win in 8 searches", done: () => state.searches <= 8 },
+      { id: "neverSpotted", label: "Never get spotted", done: () => state.spotted === 0 },
+    ],
+    2: [
+      shared[0],
+      { id: "quietPoodle", label: "No puppy barks", done: () => state.puppyBarks === 0 },
+      shared[1],
+    ],
+    3: [
+      shared[0],
+      { id: "napTime", label: "Make puppy nap", done: () => state.puppyNaps > 0 },
+      { id: "crumbCare", label: "Use 4 or fewer crumbs", done: () => state.crumbsUsed <= 4 },
+    ],
+    4: [
+      shared[0],
+      { id: "stormTiming", label: "Use a thunder window", done: () => state.thunderCount > 0 },
+      { id: "bravePoodle", label: "Max 1 puppy bark", done: () => state.puppyBarks <= 1 },
+    ],
+    5: [
+      shared[0],
+      { id: "poodlePatrol", label: "Catch the burglar", done: () => state.burglarCaught },
+      { id: "cleanFetch", label: "Use 3 or fewer Fetches", done: () => state.burglarCommands <= 3 },
+    ],
+  }[level];
+}
+
+function missionStars() {
+  return state.activeMissions.filter((mission) => mission.done()).length;
+}
+
+function missionText() {
+  return state.activeMissions.map((mission) => `${mission.done() ? "[x]" : "[ ]"} ${mission.label}`).join("\n");
+}
+
+function haptic(pattern = 18) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+function syncMobileChrome() {
+  document.body.classList.toggle("is-playing", state.playing);
+}
+
 function shuffle(items) {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -541,6 +671,10 @@ function shuffle(items) {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function pickRun() {
@@ -626,6 +760,7 @@ function nearbyDistractionItem() {
 
 function useDistraction() {
   if (!state.playing) return;
+  haptic(14);
   if (state.carriedItem) {
     dropDistraction();
     return;
@@ -785,7 +920,7 @@ function updateBurglar(dt) {
   }
   const speed = chase ? burglar.speed * 1.42 : burglar.speed;
   moveEntity(burglar, (dx / len) * speed, (dy / len) * speed, dt);
-  if (distance(puppy, burglar) < 0.62) catchBurglar();
+  if (distance(puppy, burglar) < 0.9) catchBurglar();
 }
 
 function catchBurglar() {
@@ -800,6 +935,7 @@ function catchBurglar() {
 
 function interact() {
   if (!state.playing) return;
+  haptic(10);
   const nearbySpot = searchSpots.find((spot) => distance(player, spot) < 1.05);
   if (nearbySpot) {
     if (state.won && nearbySpot.id === treasureSpot.id) {
@@ -868,7 +1004,8 @@ function updateObjective() {
   const napText = puppy.napTimer > 0 ? " Puppy napping." : "";
   const weatherText = state.level >= 4 ? (state.thunderTimer > 0 ? " Thunder masks noise!" : " Rainy day.") : "";
   const burglarText = state.level >= 5 ? (state.burglarCaught ? " Burglar caught!" : " Catch burglar.") : "";
-  objectiveEl.textContent = `Level ${state.level}. Pieces ${state.pieces.size}/3. ${left} spots left.${puppyText}${crumbText}${weatherText}${burglarText}${napText}${itemText}`;
+  const goalText = state.activeMissions.length ? ` Goals ${missionStars()}/3.` : "";
+  objectiveEl.textContent = `Level ${state.level}. Pieces ${state.pieces.size}/3. ${left} spots left.${goalText}${puppyText}${crumbText}${weatherText}${burglarText}${napText}${itemText}`;
   actionBtn.textContent = "Search";
   const nearbyItem = nearbyDistractionItem();
   distractBtn.textContent = state.carriedItem
@@ -929,21 +1066,33 @@ function update(dt) {
 function draw() {
   const viewW = canvas.clientWidth;
   const viewH = canvas.clientHeight;
-  const scale = Math.min(viewW / (WORLD_W * TILE), viewH / (WORLD_H * TILE));
+  const portrait = viewH > viewW * 1.18;
+  const fitScale = Math.min(viewW / (WORLD_W * TILE), viewH / (WORLD_H * TILE));
+  const zoomScale = portrait ? Math.min(viewW / (11.2 * TILE), viewH / (8.6 * TILE), 1.08) : fitScale;
+  const scale = Math.max(fitScale, zoomScale);
   const worldPxW = WORLD_W * TILE * scale;
   const worldPxH = WORLD_H * TILE * scale;
-  const ox = (viewW - worldPxW) / 2;
-  const oy = (viewH - worldPxH) / 2;
+  const centerX = portrait ? player.x * TILE : (WORLD_W * TILE) / 2;
+  const centerY = portrait ? player.y * TILE : (WORLD_H * TILE) / 2;
+  const desiredOx = portrait ? viewW * 0.5 - centerX * scale : (viewW - worldPxW) / 2;
+  const desiredOy = portrait ? viewH * 0.46 - centerY * scale : (viewH - worldPxH) / 2;
+  const ox = worldPxW > viewW ? clamp(desiredOx, viewW - worldPxW - 6, 6) : (viewW - worldPxW) / 2;
+  const oy = worldPxH > viewH ? clamp(desiredOy, viewH - worldPxH - 6, 6) : portrait ? Math.max(128, (viewH - worldPxH) * 0.38) : (viewH - worldPxH) / 2;
 
   const bg = ctx.createLinearGradient(0, 0, viewW, viewH);
-  bg.addColorStop(0, "#426e69");
-  bg.addColorStop(1, "#263f4f");
+  bg.addColorStop(0, "#46766f");
+  bg.addColorStop(0.52, "#2f5e61");
+  bg.addColorStop(1, "#203d4d");
   ctx.clearRect(0, 0, viewW, viewH);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, viewW, viewH);
-  ctx.fillStyle = "rgba(255, 247, 226, 0.08)";
+  ctx.fillStyle = "rgba(255, 247, 226, 0.09)";
   ctx.beginPath();
-  ctx.arc(viewW * 0.18, viewH * 0.18, Math.min(viewW, viewH) * 0.42, 0, Math.PI * 2);
+  ctx.arc(viewW * 0.18, viewH * 0.18, Math.min(viewW, viewH) * 0.46, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(245, 189, 63, 0.08)";
+  ctx.beginPath();
+  ctx.arc(viewW * 0.88, viewH * 0.7, Math.min(viewW, viewH) * 0.26, 0, Math.PI * 2);
   ctx.fill();
   ctx.save();
   ctx.translate(ox, oy);
@@ -1129,37 +1278,38 @@ function drawRainOverlay(viewW, viewH) {
 function drawAdult(adult) {
   const x = (adult.x + 0.5) * TILE;
   const y = (adult.y + 0.5) * TILE;
+  const bob = Math.sin(performance.now() / 180 + adult.x) * 1.2;
   ctx.fillStyle = colors.shadow;
   ctx.beginPath();
   ctx.ellipse(x, y + 15, 18, 8, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = colors.adultDark;
   ctx.beginPath();
-  ctx.arc(x, y + 2, 18, 0, Math.PI * 2);
+  ctx.arc(x, y + 2 + bob, 18, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = adult.alert ? colors.alert : adult.color;
   ctx.beginPath();
-  ctx.arc(x, y - 2, 16, 0, Math.PI * 2);
+  ctx.arc(x, y - 2 + bob, 16, 0, Math.PI * 2);
   ctx.fill();
   if (adult.role === "listener") {
     ctx.strokeStyle = "#fff7e9";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(x - 11, y - 18, 5, -0.4, 1.4);
-    ctx.arc(x + 11, y - 18, 5, 1.7, 3.6);
+    ctx.arc(x - 11, y - 18 + bob, 5, -0.4, 1.4);
+    ctx.arc(x + 11, y - 18 + bob, 5, 1.7, 3.6);
     ctx.stroke();
   } else {
     ctx.fillStyle = "rgba(255,247,226,0.85)";
-    roundRect(x - 11, y - 20, 22, 5, 3);
+    roundRect(x - 11, y - 20 + bob, 22, 5, 3);
   }
   ctx.fillStyle = "#f1caa8";
   ctx.beginPath();
-  ctx.arc(x + adult.dir.x * 10, y + adult.dir.y * 10, 8, 0, Math.PI * 2);
+  ctx.arc(x + adult.dir.x * 10, y + adult.dir.y * 10 + bob, 8, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = "#fff7e9";
   ctx.beginPath();
-  ctx.arc(x + adult.dir.x * 12 - adult.dir.y * 4, y + adult.dir.y * 12 + adult.dir.x * 4, 2.6, 0, Math.PI * 2);
-  ctx.arc(x + adult.dir.x * 12 + adult.dir.y * 4, y + adult.dir.y * 12 - adult.dir.x * 4, 2.6, 0, Math.PI * 2);
+  ctx.arc(x + adult.dir.x * 12 - adult.dir.y * 4, y + adult.dir.y * 12 + adult.dir.x * 4 + bob, 2.6, 0, Math.PI * 2);
+  ctx.arc(x + adult.dir.x * 12 + adult.dir.y * 4, y + adult.dir.y * 12 - adult.dir.x * 4 + bob, 2.6, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -1450,7 +1600,7 @@ function drawSearchSpot(spot) {
   const isRecent = state.nearMiss === spot.id;
   const isFound = state.won && spot.id === treasureSpot.id;
   const hasFoundPiece = checked && spot.pieceSymbol && state.pieces.has(spot.id);
-  const pulse = isFound ? Math.sin(performance.now() / 180) : 0;
+  const pulse = isFound ? Math.sin(performance.now() / 180) : Math.sin(performance.now() / 520 + spot.x) * 0.5 + 0.5;
   const x = spot.x * TILE;
   const y = spot.y * TILE;
 
@@ -1458,21 +1608,21 @@ function drawSearchSpot(spot) {
     ? "rgba(245, 189, 63, 0.28)"
     : checked
       ? "rgba(85, 72, 78, 0.12)"
-      : "rgba(255, 247, 226, 0.24)";
+      : `rgba(255, 247, 226, ${0.24 + pulse * 0.14})`;
   ctx.beginPath();
-  ctx.arc(x, y, isFound ? 31 + pulse * 5 : isRecent ? 24 : 19, 0, Math.PI * 2);
+  ctx.arc(x, y, isFound ? 31 + pulse * 5 : isRecent ? 27 : 22 + pulse * 2, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = isFound ? colors.goal : hasFoundPiece ? colors.piece : checked ? "#9f9280" : colors.clue;
   ctx.beginPath();
-  ctx.arc(x, y, isFound ? 15 : 11, 0, Math.PI * 2);
+  ctx.arc(x, y, isFound ? 16 : 13, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = checked ? "rgba(79,68,74,0.34)" : colors.clueEdge;
   ctx.lineWidth = 2;
   ctx.stroke();
 
   ctx.fillStyle = "#fff7e9";
-  ctx.font = "800 15px Trebuchet MS, sans-serif";
+  ctx.font = "900 16px Trebuchet MS, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(isFound ? "!" : hasFoundPiece ? symbolGlyphs[spot.pieceSymbol] : checked ? "x" : "?", x, y + 0.5);
@@ -1507,6 +1657,7 @@ function loop(time) {
 
 function showDialog(title, text, buttonText, onClick) {
   state.playing = false;
+  syncMobileChrome();
   dialogTitle.textContent = title;
   dialogText.textContent = text;
   dialogButton.textContent = buttonText;
@@ -1524,7 +1675,8 @@ function renderLevelPanel() {
     const level = index + 1;
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = level <= state.unlockedLevel ? `${level}. ${name}` : `${level}. Locked`;
+    const stars = "*".repeat(state.bestStars[String(level)] || 0).padEnd(3, "-");
+    button.textContent = level <= state.unlockedLevel ? `${level}. ${name} ${stars}` : `${level}. Locked`;
     button.disabled = level > state.unlockedLevel;
     button.addEventListener("click", () => start(level));
     levelChoices.appendChild(button);
@@ -1547,6 +1699,8 @@ function renderLevelPanel() {
 
 function showLevelSelect(title = "Choose a Level", text = "Replay an unlocked level or continue your newest adventure.") {
   state.playing = false;
+  syncMobileChrome();
+  haptic(8);
   dialogTitle.textContent = title;
   dialogText.textContent = text;
   dialogButton.textContent = "Continue";
@@ -1557,8 +1711,25 @@ function showLevelSelect(title = "Choose a Level", text = "Replay an unlocked le
   dialog.classList.remove("hidden");
 }
 
+function pauseGame() {
+  if (!state.playing) {
+    showLevelSelect();
+    return;
+  }
+  showLevelSelect("Paused", "Take a breath, choose a level, or continue the current adventure.");
+  dialogButton.textContent = "Resume";
+  dialogButton.onclick = () => {
+    haptic(10);
+    dialog.classList.add("hidden");
+    state.playing = true;
+    syncMobileChrome();
+    showMessage("Back to tiptoeing.", 1.2);
+  };
+}
+
 function showLockDialog() {
   state.playing = false;
+  syncMobileChrome();
   state.lockInput = [];
   dialogTitle.textContent = "Unlock the Chest";
   dialogText.textContent = "Tap the three symbols from the board-game pieces. Missing pieces can still be guessed.";
@@ -1566,6 +1737,7 @@ function showLockDialog() {
   dialogButton.onclick = () => {
     dialog.classList.add("hidden");
     state.playing = true;
+    syncMobileChrome();
     showMessage("Find more pieces or try the chest lock again.", 2);
   };
   lockPanel.classList.remove("hidden");
@@ -1645,6 +1817,8 @@ function start(level = 1) {
   state.burglarCommands = 0;
   state.wasSeen = false;
   state.lockInput = [];
+  state.earnedStickers = [];
+  state.activeMissions = missionsForLevel(level);
   state.won = false;
   distractionItems.forEach((item) => {
     item.x = item.startX;
@@ -1683,6 +1857,7 @@ function start(level = 1) {
     3.6,
   );
   state.playing = true;
+  syncMobileChrome();
 }
 
 function findChest() {
@@ -1715,6 +1890,7 @@ function awardStickers() {
   if (state.level >= 3 && state.puppyNaps > 0) earned.push("snackGenius");
   if (state.level >= 4 && state.thunderCount > 0 && state.spotted <= 2) earned.push("thunderTimer");
   if (state.level >= 5 && state.burglarCaught) earned.push("poodlePatrol");
+  if (missionStars() === 3) earned.push("starChaser");
   if (rating() === "Master Tiptoer") earned.push("masterTiptoer");
   if (secretEndingUnlocked()) earned.push("gameNight");
   state.earnedStickers = earned.filter((id) => !state.stickers.has(id));
@@ -1729,6 +1905,8 @@ function stickerText() {
 
 function scoreText() {
   const perfect = state.pieces.size === 3 ? "Complete board game ending!" : "Board game found, with pieces still missing.";
+  const stars = missionStars();
+  const goalLine = state.activeMissions.length ? `\nStars: ${stars}/3\n${missionText()}` : "";
   const puppyLine = state.level >= 2 ? `\nPuppy barks: ${state.puppyBarks}` : "";
   const snackLine = state.level >= 3 ? `\nSnack crumbs used: ${state.crumbsUsed}\nPuppy naps: ${state.puppyNaps}` : "";
   const rainLine = state.level >= 4 ? `\nThunder rumbles: ${state.thunderCount}` : "";
@@ -1737,6 +1915,7 @@ function scoreText() {
 ${perfect}
 
 Rating: ${rating()}
+${goalLine}
 Calm left: ${Math.round(state.calm)}%
 Searches: ${state.searches}
 Distractions used: ${state.distractionsUsed}
@@ -1748,6 +1927,7 @@ function completeWin() {
   state.won = true;
   tone(980, 0.14);
   unlockLevel(state.level + 1);
+  updateBestStars(missionStars());
   awardStickers();
   const resultText = `${scoreText()}${stickerText()}`;
   if (state.level === 1) {
@@ -1784,6 +1964,7 @@ Secret ending unlocked: everyone gathers around the table, the poodle curls up b
 }
 
 function lose() {
+  const goalLine = state.activeMissions.length ? `\nStars so far: ${missionStars()}/3\n${missionText()}` : "";
   const puppyLine = state.level >= 2 ? `\nPuppy barks: ${state.puppyBarks}` : "";
   const snackLine = state.level >= 3 ? `\nSnack crumbs used: ${state.crumbsUsed}\nPuppy naps: ${state.puppyNaps}` : "";
   const rainLine = state.level >= 4 ? `\nThunder rumbles: ${state.thunderCount}` : "";
@@ -1794,7 +1975,7 @@ Calm left: ${Math.round(state.calm)}%
 Searches: ${state.searches}
 Distractions used: ${state.distractionsUsed}
 Times spotted: ${state.spotted}
-Board-game pieces: ${state.pieces.size}/3${puppyLine}${snackLine}${rainLine}${burglarLine}`, "Try again", () => start(state.level));
+Board-game pieces: ${state.pieces.size}/3${goalLine}${puppyLine}${snackLine}${rainLine}${burglarLine}`, "Try again", () => start(state.level));
 }
 
 let audioContext;
@@ -1823,16 +2004,24 @@ document.querySelectorAll(".touch-pad button").forEach((button) => {
   const dir = button.dataset.dir;
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    haptic(7);
     pressedDirs.add(dir);
+    button.classList.add("held");
     button.setPointerCapture(event.pointerId);
   });
-  button.addEventListener("pointerup", () => pressedDirs.delete(dir));
-  button.addEventListener("pointercancel", () => pressedDirs.delete(dir));
-  button.addEventListener("pointerleave", () => pressedDirs.delete(dir));
+  const release = () => {
+    pressedDirs.delete(dir);
+    button.classList.remove("held");
+  };
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("pointerleave", release);
 });
 actionBtn.addEventListener("click", interact);
 distractBtn.addEventListener("click", useDistraction);
+pauseBtn.addEventListener("click", pauseGame);
 soundBtn.addEventListener("click", () => {
+  haptic(8);
   state.sound = !state.sound;
   soundBtn.textContent = state.sound ? "On" : "Snd";
   tone(520, 0.06);

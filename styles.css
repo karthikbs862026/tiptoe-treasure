@@ -20,6 +20,11 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   background:
     radial-gradient(circle at 18% 18%, rgba(255, 247, 226, 0.2), transparent 30%),
     radial-gradient(circle at 84% 76%, rgba(99, 201, 156, 0.24), transparent 34%),
@@ -33,6 +38,7 @@ button {
   color: inherit;
   border: 0;
   touch-action: manipulation;
+  cursor: pointer;
 }
 
 .shell {
@@ -65,16 +71,16 @@ button {
 .dialog {
   position: absolute;
   z-index: 2;
-  border: 2px solid rgba(71, 50, 82, 0.16);
+  border: 2px solid rgba(71, 50, 82, 0.14);
   background: var(--panel);
-  box-shadow: 0 12px 26px var(--shadow), inset 0 1px rgba(255, 255, 255, 0.7);
+  box-shadow: 0 12px 28px var(--shadow), inset 0 1px rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(10px) saturate(1.08);
 }
 
 .top-left {
   top: max(12px, env(safe-area-inset-top));
   left: max(12px, env(safe-area-inset-left));
-  width: min(390px, calc(100vw - 144px));
+  width: min(390px, calc(100vw - 174px));
   padding: 11px 13px;
   border-radius: 8px;
 }
@@ -97,7 +103,7 @@ button {
   top: max(12px, env(safe-area-inset-top));
   right: max(12px, env(safe-area-inset-right));
   display: grid;
-  grid-template-columns: auto 88px 44px 56px;
+  grid-template-columns: auto 88px 38px 44px 56px;
   align-items: center;
   gap: 8px;
   padding: 9px;
@@ -130,7 +136,7 @@ button {
 
 .icon-btn {
   width: 44px;
-  height: 32px;
+  height: 34px;
   border-radius: 8px;
   background: linear-gradient(180deg, #67b5ed, var(--blue));
   color: #fffdf7;
@@ -139,17 +145,21 @@ button {
   box-shadow: 0 5px 12px rgba(51, 40, 61, 0.18), inset 0 -3px rgba(47, 39, 53, 0.16);
 }
 
+#pauseBtn {
+  width: 38px;
+}
+
 .prompt {
   left: 50%;
-  bottom: max(88px, calc(env(safe-area-inset-bottom) + 80px));
-  max-width: min(440px, calc(100vw - 32px));
+  bottom: max(112px, calc(env(safe-area-inset-bottom) + 104px));
+  max-width: min(380px, calc(100vw - 210px));
   min-height: 42px;
   transform: translateX(-50%);
   padding: 9px 14px;
   border-color: rgba(245, 189, 63, 0.45);
-  border-radius: 999px;
+  border-radius: 26px;
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   color: #4a3159;
   opacity: 0;
@@ -175,6 +185,12 @@ button {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 46%),
     var(--panel);
+}
+
+body.is-playing .dialog.hidden ~ .touch-pad,
+body.is-playing .action-btn,
+body.is-playing .distract-btn {
+  animation: controlsIn 220ms ease-out both;
 }
 
 .dialog.hidden {
@@ -349,15 +365,15 @@ button {
   left: max(14px, env(safe-area-inset-left));
   bottom: max(14px, env(safe-area-inset-bottom));
   display: grid;
-  grid-template-columns: repeat(3, 52px);
-  grid-template-rows: repeat(3, 52px);
-  gap: 4px;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(3, 56px);
+  gap: 5px;
 }
 
 .touch-pad button {
-  width: 52px;
-  height: 52px;
-  border-radius: 8px;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
   border: 2px solid rgba(71, 50, 82, 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(255, 247, 226, 0.86));
@@ -368,11 +384,17 @@ button {
 }
 
 .touch-pad button:active,
+.touch-pad button.held,
 .action-btn:active,
 .distract-btn:active,
 .icon-btn:active,
 .dialog button:active {
   transform: translateY(2px);
+}
+
+.touch-pad button.held {
+  background: linear-gradient(180deg, #fff7e7, #d9f0e5);
+  box-shadow: 0 3px 8px rgba(51, 40, 61, 0.2), inset 0 -2px rgba(47, 39, 53, 0.1);
 }
 
 .touch-pad [data-dir="up"] {
@@ -400,19 +422,32 @@ button {
   right: max(18px, env(safe-area-inset-right));
   bottom: max(24px, env(safe-area-inset-bottom));
   min-width: 0;
-  width: 86px;
-  height: 58px;
+  width: 92px;
+  height: 64px;
+  border-radius: 16px;
 }
 
 .distract-btn {
   position: absolute;
   z-index: 2;
-  right: max(112px, calc(env(safe-area-inset-right) + 112px));
+  right: max(120px, calc(env(safe-area-inset-right) + 120px));
   bottom: max(24px, env(safe-area-inset-bottom));
   min-width: 0;
-  width: 78px;
-  height: 58px;
+  width: 84px;
+  height: 64px;
+  border-radius: 16px;
   background: linear-gradient(180deg, #77c6f0, var(--blue));
+}
+
+@keyframes controlsIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (min-width: 780px) {
@@ -423,8 +458,9 @@ button {
 
 @media (max-width: 520px) {
   .top-left {
-    width: calc(100vw - 132px);
-    padding: 8px 10px;
+    width: calc(100vw - 24px);
+    padding: 7px 9px;
+    border-radius: 10px;
   }
 
   .brand {
@@ -436,8 +472,11 @@ button {
   }
 
   .top-right {
-    grid-template-columns: 74px 38px 48px;
+    top: max(66px, calc(env(safe-area-inset-top) + 66px));
+    grid-template-columns: 68px 34px 36px 46px;
     gap: 6px;
+    padding: 7px;
+    border-radius: 10px;
   }
 
   .meter-label {
@@ -445,36 +484,53 @@ button {
   }
 
   .calm-track {
-    width: 74px;
+    width: 68px;
   }
 
   .icon-btn {
-    width: 38px;
+    width: 36px;
+    height: 34px;
     font-size: 11px;
   }
 
+  #pauseBtn {
+    width: 34px;
+  }
+
   #shareBtn {
-    width: 48px;
+    width: 46px;
   }
 
   .touch-pad {
-    grid-template-columns: repeat(3, 48px);
-    grid-template-rows: repeat(3, 48px);
+    grid-template-columns: repeat(3, 52px);
+    grid-template-rows: repeat(3, 52px);
+    bottom: max(72px, calc(env(safe-area-inset-bottom) + 72px));
   }
 
   .touch-pad button {
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
   }
 
   .action-btn {
-    width: 78px;
-    height: 54px;
+    width: 84px;
+    height: 58px;
+    bottom: max(78px, calc(env(safe-area-inset-bottom) + 78px));
   }
 
   .distract-btn {
-    right: max(102px, calc(env(safe-area-inset-right) + 102px));
-    width: 72px;
-    height: 54px;
+    right: max(108px, calc(env(safe-area-inset-right) + 108px));
+    width: 76px;
+    height: 58px;
+    bottom: max(78px, calc(env(safe-area-inset-bottom) + 78px));
+  }
+
+  .prompt {
+    left: 56%;
+    bottom: max(148px, calc(env(safe-area-inset-bottom) + 148px));
+    max-width: min(250px, calc(100vw - 170px));
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.22;
   }
 }
